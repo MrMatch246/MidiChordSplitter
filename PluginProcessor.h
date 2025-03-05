@@ -83,7 +83,7 @@ private:
     std::atomic<float> * lowKnobParameter = nullptr;
 
     // New auxiliary functions
-    void processToggleNotes(const juce::SortedSet<int>& notes, juce::SortedSet<int>& notesToProcess, float knobValue, bool isHighToggle);
+    void processToggleNotes(const juce::SortedSet<int>& notes, juce::SortedSet<int>& notesToProcess, float knobValue, bool isHighToggle,bool isLowToggle);
 
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(MidiChordSplitterAudioProcessor)

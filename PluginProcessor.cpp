@@ -162,15 +162,15 @@ void MidiChordSplitterAudioProcessor::processBlock(juce::AudioBuffer<float>& buf
     // Process notes based on the toggle and knob values
     if (highToggleParameter->load())
     {
-        processToggleNotes(notes, notesToProcess, highKnobParameter->load(), true);
+        processToggleNotes(notes, notesToProcess, highKnobParameter->load(), true, false);
     }
     if (midToggleParameter->load())
     {
-        processToggleNotes(notes, notesToProcess, midKnobParameter->load(), false);
+        processToggleNotes(notes, notesToProcess, midKnobParameter->load(), false, false);
     }
     if (lowToggleParameter->load())
     {
-        processToggleNotes(notes, notesToProcess, lowKnobParameter->load(), false);
+        processToggleNotes(notes, notesToProcess, lowKnobParameter->load(), false,true);
     }
 
     // Now process the MIDI messages with the filtered notes
@@ -178,7 +178,14 @@ void MidiChordSplitterAudioProcessor::processBlock(juce::AudioBuffer<float>& buf
     {
         const auto msg = metadata.getMessage();
         const auto NoteNumber = msg.getNoteNumber();
+
+        // Process "Note On" and "Note Off" events if the note is in the processed set
         if (notesToProcess.contains(NoteNumber))
+        {
+            processedMidi.addEvent(msg, metadata.samplePosition);
+        }
+        // Ensure "Note Off" events are also processed when the note is selected
+        else if (msg.isNoteOff())
         {
             processedMidi.addEvent(msg, metadata.samplePosition);
         }
@@ -187,31 +194,57 @@ void MidiChordSplitterAudioProcessor::processBlock(juce::AudioBuffer<float>& buf
     midiMessages.swapWith(processedMidi);
 }
 
-void MidiChordSplitterAudioProcessor::processToggleNotes(const juce::SortedSet<int>& notes, juce::SortedSet<int>& notesToProcess, float knobValue, bool isHighToggle)
+void MidiChordSplitterAudioProcessor::processToggleNotes(const juce::SortedSet<int>& notes, juce::SortedSet<int>& notesToProcess, float knobValue, bool isHighToggle, bool isLowToggle)
 {
     if (notes.isEmpty()) return;
 
-    // Determine the notes to process based on knob value
     const int numNotes = notes.size();
     int noteIndex = -1;
 
+    // Handling High Toggle: Highest note based on knob value
     if (isHighToggle)
     {
-        // For the high toggle, get the highest note based on the knob
-        noteIndex = numNotes - 1 - (int)knobValue;
+        // For high toggle, select the highest note based on the knob value (0 = highest)
+        noteIndex = numNotes - 1 - (int)knobValue; // Select based on descending order (highest note first)
     }
-    else if (knobValue >= 0)
+    // Handling Low Toggle: Lowest note based on knob value
+    else if (isLowToggle)
     {
-        // For low/mid, calculate the index based on knob value
-        noteIndex = juce::jmin((int)knobValue, numNotes - 1);  // Ensure we don't exceed the available notes
+        // For low toggle, select the lowest notes based on knob value (0 = lowest)
+        if (knobValue < numNotes)
+        {
+            noteIndex = (int)knobValue;
+        }
+    }
+    // Handling Mid Toggle: Median note calculation (when knobValue >= 1)
+    else if (!isHighToggle && !isLowToggle && knobValue >= 1.0f)
+    {
+        // For mid toggle, find the median
+        int medianIndex = (numNotes - 1) / 2; // Default median (round down)
+        if (knobValue > 1)
+        {
+            for (int i = medianIndex - knobValue/2; i <= medianIndex + knobValue/2; ++i)
+            {
+                if (i >= 0 && i < numNotes)
+                {
+                    notesToProcess.add(notes.getReference(i));
+                }
+            }
+            return;
+        }
+
+        noteIndex = medianIndex;
+
     }
 
+    // Ensure the knob value doesn't exceed available notes
     if (noteIndex >= 0 && noteIndex < numNotes)
     {
         // Add the note to the processing list
         notesToProcess.add(notes.getReference(noteIndex));
     }
 }
+
 
 
 bool MidiChordSplitterAudioProcessor::hasEditor() const
@@ -226,14 +259,18 @@ juce::AudioProcessorEditor* MidiChordSplitterAudioProcessor::createEditor()
 
 void MidiChordSplitterAudioProcessor::getStateInformation(juce::MemoryBlock& destData)
 {
-    // Store parameters in the memory block
-    juce::ignoreUnused(destData);
+    auto state = parameters.copyState();
+    std::unique_ptr<juce::XmlElement> xml (state.createXml());
+    copyXmlToBinary (*xml, destData);
 }
 
 void MidiChordSplitterAudioProcessor::setStateInformation(const void* data, int sizeInBytes)
 {
-    // Restore parameters from the memory block
-    juce::ignoreUnused(data, sizeInBytes);
+    std::unique_ptr<juce::XmlElement> xmlState (getXmlFromBinary (data, sizeInBytes));
+
+    if (xmlState.get() != nullptr)
+        if (xmlState->hasTagName (parameters.state.getType()))
+            parameters.replaceState (juce::ValueTree::fromXml (*xmlState));
 }
 
 //==============================================================================

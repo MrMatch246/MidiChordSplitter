@@ -8,7 +8,7 @@ MidiChordSplitterAudioProcessorEditor::MidiChordSplitterAudioProcessorEditor(Mid
 
 
     addAndMakeVisible(versionLabel);
-    versionLabel.setText("Version: 1.2.1 ", juce::dontSendNotification);
+    versionLabel.setText("Version: 1.0.0 by TheGreatElemonade ", juce::dontSendNotification);
 
     // High Frequency Toggle and Knob
     addAndMakeVisible(highToggle);
