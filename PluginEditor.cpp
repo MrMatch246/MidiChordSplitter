@@ -6,93 +6,59 @@ MidiChordSplitterAudioProcessorEditor::MidiChordSplitterAudioProcessorEditor(Mid
     : AudioProcessorEditor(&p), processorRef(p), valueTreeState (vts)
 {
 
-    addAndMakeVisible(bpmLabel);
-    bpmLabel.setText("BPM: ", juce::dontSendNotification);
-
-    addAndMakeVisible(timeSignatureLabel);
-    timeSignatureLabel.setText("DAW Signature:", juce::dontSendNotification);
 
     addAndMakeVisible(versionLabel);
     versionLabel.setText("Version: 1.2.1 ", juce::dontSendNotification);
 
-    addAndMakeVisible(syncLabel);
-    syncLabel.setText("Sync Mode", juce::dontSendNotification);
+    // High Frequency Toggle and Knob
+    addAndMakeVisible(highToggle);
+    highToggle.setClickingTogglesState(true);
+    highToggle.setButtonText("High");
+    setButtonColors(highToggle);
+    highToggle.addListener(this);
+    highToggleAttachment.reset(new ButtonAttachment(valueTreeState, "highToggle", highToggle));
 
-    addAndMakeVisible(tripletLabel);
-    tripletLabel.setText("Triplet Mode", juce::dontSendNotification);
+    addAndMakeVisible(highKnob);
+    highKnob.setSliderStyle(juce::Slider::SliderStyle::RotaryVerticalDrag);
+    highKnob.setRange(0.0f, 16.0f, 1.00f);
+    highKnob.setTextBoxStyle(juce::Slider::TextBoxBelow, false, 50, 20);
+    highKnob.setTextValueSuffix(" Offset");
+    highKnob.setValue(0.0f);
+    highKnobAttachment.reset(new SliderAttachment(valueTreeState, "highKnob", highKnob));
 
-    addAndMakeVisible(strumDirectionLabel);
-    strumDirectionLabel.setText("Strum Direction", juce::dontSendNotification);
+    // Mid Frequency Toggle and Knob
+    addAndMakeVisible(midToggle);
+    midToggle.setClickingTogglesState(true);
+    midToggle.setButtonText("Mid");
+    setButtonColors(midToggle);
+    midToggle.addListener(this);
+    midToggleAttachment.reset(new ButtonAttachment(valueTreeState, "midToggle", midToggle));
 
-    addAndMakeVisible(enforceOrderLabel);
-    enforceOrderLabel.setText("Order Mode", juce::dontSendNotification);
+    addAndMakeVisible(midKnob);
+    midKnob.setSliderStyle(juce::Slider::SliderStyle::RotaryVerticalDrag);
+    midKnob.setRange(1.0f, 16.0f, 1.00f);
+    midKnob.setTextBoxStyle(juce::Slider::TextBoxBelow, false, 50, 20);
+    midKnob.setTextValueSuffix(" Offset");
+    midKnob.setValue(1.0f);
+    midKnobAttachment.reset(new SliderAttachment(valueTreeState, "midKnob", midKnob));
 
-    addAndMakeVisible(timeSignatureSelectionLabel);
-    timeSignatureSelectionLabel.setText("Time Signature", juce::dontSendNotification);
+    // Low Frequency Toggle and Knob
+    addAndMakeVisible(lowToggle);
+    lowToggle.setClickingTogglesState(true);
+    lowToggle.setButtonText("Low");
+    setButtonColors(lowToggle);
+    lowToggle.addListener(this);
+    lowToggleAttachment.reset(new ButtonAttachment(valueTreeState, "lowToggle", lowToggle));
 
+    addAndMakeVisible(lowKnob);
+    lowKnob.setSliderStyle(juce::Slider::SliderStyle::RotaryVerticalDrag);
+    lowKnob.setRange(0.0f, 16.0f, 1.00f);
+    lowKnob.setTextBoxStyle(juce::Slider::TextBoxBelow, false, 50, 20);
+    lowKnob.setTextValueSuffix(" Offset");
+    lowKnob.setValue(0.0f);
+    lowKnobAttachment.reset(new SliderAttachment(valueTreeState, "lowKnob", lowKnob));
 
-    addAndMakeVisible(strumDelaySlider);
-    strumDelaySlider.setSliderStyle(juce::Slider::SliderStyle::RotaryVerticalDrag);
-    strumDelaySlider.setRange(0.0f, 1000.0f, 0.1f);
-    strumDelaySlider.setTextBoxStyle(juce::Slider::TextBoxBelow, false, 50, 20);
-    strumDelaySlider.setPopupDisplayEnabled(true, false, this);
-    strumDelaySlider.setValue(250.0f);
-    strumDelaySlider.setTextValueSuffix("ms");
-    strumDelayAttachment.reset(new SliderAttachment(valueTreeState, "strumDelayMs", strumDelaySlider));
-    strumDelaySlider.setEnabled(false);
-
-
-    addAndMakeVisible(syncButton);
-    syncButton.setClickingTogglesState(true);
-    syncButton.setButtonText("Sync");
-    setButtonColors(syncButton);
-    syncButton.setToggleState(true, juce::NotificationType::dontSendNotification);
-    syncButton.addListener(this);
-    syncAttachment.reset(new ButtonAttachment(valueTreeState, "isSynced", syncButton));
-
-
-    addAndMakeVisible(tripletButton);
-    tripletButton.setClickingTogglesState(true);
-    tripletButton.setButtonText("Normal");
-    setButtonColors(tripletButton);
-    tripletButton.setToggleState(true, juce::NotificationType::dontSendNotification);
-    tripletButton.addListener(this);
-    tripletAttachment.reset(new ButtonAttachment(valueTreeState, "isTriplet", tripletButton));
-
-
-    addAndMakeVisible(enforceOrderButton);
-    enforceOrderButton.setClickingTogglesState(true);
-    enforceOrderButton.setButtonText("Unchanged");
-    setButtonColors(enforceOrderButton);
-    enforceOrderButton.setToggleState(false, juce::NotificationType::dontSendNotification);
-    enforceOrderButton.addListener(this);
-    enforceOrderAttachment.reset(new ButtonAttachment(valueTreeState, "enforceOrder", enforceOrderButton));
-
-
-    addAndMakeVisible(strumDirectionButton);
-    strumDirectionButton.setClickingTogglesState(true);
-    strumDirectionButton.setButtonText("Up");
-    setButtonColors(strumDirectionButton);
-    strumDirectionButton.setToggleState(true, juce::NotificationType::dontSendNotification);
-    strumDirectionButton.addListener(this);
-    strumDirectionAttachment.reset(new ButtonAttachment(valueTreeState, "isStrummingUp", strumDirectionButton));
-
-
-    addAndMakeVisible(timeSignatureComboBox);
-    juce::StringArray choices = processorRef.choices(false);
-    timeSignatureComboBox.clear();
-    for (int i = 0; i < choices.size(); i++)
-    {
-        timeSignatureComboBox.addItem(choices[i], i + 1);
-    }
-
-    timeSignatureComboBox.setSelectedId(2);
-    // timeSignatureComboBox.addListener(this);
-    timeSignatureAttachment.reset(new ComboBoxAttachment(valueTreeState, "timeSignatureChoice", timeSignatureComboBox));
-
-
-
-    setSize(400, 200);
+    setSize(200, 400);
 }
 
 MidiChordSplitterAudioProcessorEditor::~MidiChordSplitterAudioProcessorEditor()
@@ -102,110 +68,76 @@ MidiChordSplitterAudioProcessorEditor::~MidiChordSplitterAudioProcessorEditor()
 //==============================================================================
 void MidiChordSplitterAudioProcessorEditor::paint(juce::Graphics& g)
 {
-    // (Our component is opaque, so we must completely fill the background with a solid colour)
     g.fillAll(getLookAndFeel().findColour(juce::ResizableWindow::backgroundColourId));
-
 }
 
 void MidiChordSplitterAudioProcessorEditor::resized()
 {
-    strumDelaySlider.setBounds(getWidth() / 2 - 45, 20, 110, 110);
-    // This is generally where you'll want to lay out the positions of any
-    // subcomponents in your editor..
+    // Get the available area
+    auto area = getLocalBounds().reduced(10); // Leave some space for borders
 
-    // Position and size the components
-    auto area = getLocalBounds().reduced(10);
-    auto row = area.removeFromTop(20);
+    // We will use a grid-like layout for the toggles and knobs
+    int padding = 3;  // Set some padding between components
+    int toggleSize = 80;
+    int knobSize = 90;
 
-    syncLabel.setBounds(row.removeFromRight(90));
-    bpmLabel.setBounds(row.removeFromLeft(90));
+    // Define the positions for the toggles and knobs
+    auto highToggleArea = area.removeFromTop(100);  // Make room for toggle
+    highToggle.setBounds(highToggleArea.removeFromLeft(toggleSize).withHeight(toggleSize));
+    highKnob.setBounds(highToggleArea.removeFromRight(knobSize).withHeight(knobSize));
 
-    row = area.removeFromTop(3);
-    row = area.removeFromTop(20);
+    // Move the remaining area down for the next row
+    area.removeFromTop(padding);  // Space between rows
+    auto midToggleArea = area.removeFromTop(100);  // Make room for toggle
+    midToggle.setBounds(midToggleArea.removeFromLeft(toggleSize).withHeight(toggleSize));
+    midKnob.setBounds(midToggleArea.removeFromRight(knobSize).withHeight(knobSize));
 
-    syncButton.setBounds(row.removeFromRight(100));
-    timeSignatureLabel.setBounds(row.removeFromLeft(120));
+    // Move the remaining area down for the next row
+    area.removeFromTop(padding);  // Space between rows
+    auto lowToggleArea = area.removeFromTop(100);  // Make room for toggle
+    lowToggle.setBounds(lowToggleArea.removeFromLeft(toggleSize).withHeight(toggleSize));
+    lowKnob.setBounds(lowToggleArea.removeFromRight(knobSize).withHeight(knobSize));
 
-    row = area.removeFromTop(3);
-    row = area.removeFromTop(20);
-
-    tripletLabel.setBounds(row.removeFromRight(90));
-    strumDirectionLabel.setBounds(row.removeFromLeft(100));
-
-    row = area.removeFromTop(3);
-    row = area.removeFromTop(20);
-
-    tripletButton.setBounds(row.removeFromRight(100));
-    strumDirectionButton.setBounds(row.removeFromLeft(100));
-
-    row = area.removeFromTop(3);
-    row = area.removeFromTop(20);
-
-    timeSignatureSelectionLabel.setBounds(row.removeFromRight(100));
-    enforceOrderLabel.setBounds(row.removeFromLeft(120));
-
-    row = area.removeFromTop(3);
-    row = area.removeFromTop(20);
-
-    timeSignatureComboBox.setBounds(row.removeFromRight(100));
-    enforceOrderButton.setBounds(row.removeFromLeft(100));
-
-    versionLabel.setBounds(area.removeFromBottom(20));
+    // Version label at the bottom
+    versionLabel.setBounds(area.removeFromBottom(30).reduced(0, 5));  // Leave some space for margin
 }
+
+
+
+
 
 void MidiChordSplitterAudioProcessorEditor::buttonClicked(juce::Button* button)
 {
-    if (button == &syncButton)
+    if (button == &highToggle)
     {
         // Toggle button state has changed, handle the action here
-        bool syncEnabled = syncButton.getToggleState();
-        strumDelaySlider.setEnabled(!syncEnabled);
-        tripletButton.setEnabled(syncEnabled);
-        timeSignatureComboBox.setEnabled(syncEnabled);
-        syncButton.setButtonText(syncEnabled ? "Sync" : "Free");
+        bool highEnabled = highToggle.getToggleState();
+        highKnob.setEnabled(highEnabled);
     }
-    else if (button == &tripletButton)
+    else if (button == &midToggle)
     {
-        bool tripletEnabled = tripletButton.getToggleState();
-        tripletButton.setButtonText(tripletEnabled ? "Triplet" : "Normal");
+        // Toggle button state has changed, handle the action here
+        bool midEnabled = midToggle.getToggleState();
+        midKnob.setEnabled(midEnabled);
     }
-    else if (button == &strumDirectionButton)
+    else if (button == &lowToggle)
     {
-        bool strumDirection = strumDirectionButton.getToggleState();
-        strumDirectionButton.setButtonText(strumDirection ? "Up" : "Down");
+        // Toggle button state has changed, handle the action here
+        bool lowEnabled = lowToggle.getToggleState();
+        lowKnob.setEnabled(lowEnabled);
     }
-    else if (button == &enforceOrderButton)
-    {
-        bool enforceOrder = enforceOrderButton.getToggleState();
-        enforceOrderButton.setButtonText(enforceOrder ? "Enforce Order" : "Unchanged");
-    }
+
+
     this->updateLabels();
 }
 
 void MidiChordSplitterAudioProcessorEditor::comboBoxChanged(juce::ComboBox* comboBox)
 {
-    if (comboBox == &timeSignatureComboBox)
-    {
-        processorRef.timeSignatureChoice->setValueNotifyingHost(timeSignatureComboBox.getSelectedId() - 1);
-        this->updateLabels();
-    }
+    this->updateLabels();
 }
-
 
 void MidiChordSplitterAudioProcessorEditor::updateLabels()
 {
-    bpmLabel.setText("BPM:" + juce::String(processorRef.bpm), juce::dontSendNotification);
-
-    timeSignatureLabel.setText("DAW Signature: " + juce::String(processorRef.timeSig.numerator) + "/" + juce::String(processorRef.timeSig.denominator), juce::dontSendNotification);
-    auto choice = processorRef.timeSignatureChoice->getIndex();
-    timeSignatureComboBox.clear();
-    juce::StringArray choices = processorRef.choices(tripletButton.getToggleState());
-    for (int i = 0; i < choices.size(); i++)
-    {
-        timeSignatureComboBox.addItem(choices[i], i + 1);
-    }
-    timeSignatureComboBox.setSelectedId(choice + 1);
-
 }
 
 void MidiChordSplitterAudioProcessorEditor::setButtonColors(juce::TextButton& button)

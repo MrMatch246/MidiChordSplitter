@@ -17,7 +17,6 @@ public:
     typedef juce::AudioProcessorValueTreeState::ComboBoxAttachment ComboBoxAttachment;
 private:
 
-
     // void sliderValueChanged(juce::Slider* slider) override;
     void buttonClicked(juce::Button* button) override;
     void comboBoxChanged(juce::ComboBox* comboBox) override;
@@ -27,32 +26,30 @@ private:
     // This reference is provided as a quick way for your editor to
     // access the processor object that created it.
     MidiChordSplitterAudioProcessor& processorRef;
-    juce::Slider strumDelaySlider;
-    bool isSynced{};
-    juce::Label bpmLabel;
-    juce::Label timeSignatureLabel;
-    juce::Label timeSignatureSelectionLabel;
     juce::Label versionLabel;
-    juce::Label syncLabel;
-    juce::Label tripletLabel;
-    juce::Label strumDirectionLabel;
-    juce::Label enforceOrderLabel;
 
-    juce::TextButton syncButton;
-    juce::TextButton tripletButton;
-    juce::TextButton strumDirectionButton;
-    juce::TextButton enforceOrderButton;
-    juce::ComboBox timeSignatureComboBox;
+
+    // New controls for high, mid, and low frequencies
+    juce::TextButton highToggle;
+    juce::TextButton midToggle;
+    juce::TextButton lowToggle;
+
+    juce::Slider highKnob;
+    juce::Slider midKnob;
+    juce::Slider lowKnob;
+
     juce::Label divLabel;
 
     juce::AudioProcessorValueTreeState& valueTreeState;
 
-    std::unique_ptr<SliderAttachment> strumDelayAttachment;
-    std::unique_ptr<ButtonAttachment> syncAttachment;
-    std::unique_ptr<ButtonAttachment> tripletAttachment;
-    std::unique_ptr<ButtonAttachment> strumDirectionAttachment;
-    std::unique_ptr<ButtonAttachment> enforceOrderAttachment;
-    std::unique_ptr<ComboBoxAttachment> timeSignatureAttachment;
+    // New attachments for high, mid, low toggles and knobs
+    std::unique_ptr<ButtonAttachment> highToggleAttachment;
+    std::unique_ptr<ButtonAttachment> midToggleAttachment;
+    std::unique_ptr<ButtonAttachment> lowToggleAttachment;
+
+    std::unique_ptr<SliderAttachment> highKnobAttachment;
+    std::unique_ptr<SliderAttachment> midKnobAttachment;
+    std::unique_ptr<SliderAttachment> lowKnobAttachment;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (MidiChordSplitterAudioProcessorEditor)
 };

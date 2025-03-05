@@ -6,16 +6,17 @@
 class MidiChordSplitterAudioProcessor final : public juce::AudioProcessor
 {
 public:
-    juce::AudioParameterFloat* strumDelayMs;
-    double bpm{};
-    juce::AudioParameterBool* isSynced;
-    juce::AudioParameterBool* isTriplet;
-    juce::AudioParameterBool* isStrummingUp;
-    juce::AudioParameterBool* enforceOrder;
-    juce::AudioParameterChoice* timeSignatureChoice;
-    juce::AudioPlayHead::TimeSignature timeSig{4, 4};
-    const juce::StringArray choices(bool triplet = false);
+    // Existing parameters for strummin
 
+
+
+    // New parameters for high, mid, and low toggles and knobs
+    juce::AudioParameterBool* highToggle;
+    juce::AudioParameterFloat* highKnob;
+    juce::AudioParameterBool* midToggle;
+    juce::AudioParameterFloat* midKnob;
+    juce::AudioParameterBool* lowToggle;
+    juce::AudioParameterFloat* lowKnob;
 
     //==============================================================================
     MidiChordSplitterAudioProcessor();
@@ -61,14 +62,12 @@ public:
     const juce::String getProgramName(int index) override;
     void changeProgramName(int index, const juce::String& newName) override;
 
-
     //==============================================================================
     void getStateInformation(juce::MemoryBlock& destData) override;
     void setStateInformation(const void* data, int sizeInBytes) override;
-    double timePerBeat(int bpm, int x, int y, bool triplet);
+
 
     juce::ValueTree getParameters() { return parameters.copyState(); }
-
 
 private:
     std::map<int, int> preholdNotes;
@@ -76,12 +75,16 @@ private:
     juce::AudioPlayHead* playHead{};
     juce::AudioPlayHead::CurrentPositionInfo cpi;
     juce::AudioProcessorValueTreeState parameters;
-    std::atomic<float>* strumDelayParameter = nullptr;
-    std::atomic<float>* isSyncedParameter = nullptr;
-    std::atomic<float>* isTripletParameter = nullptr;
-    std::atomic<int>* timeSignatureParameter = nullptr;
-    std::atomic<float>* isStrummingUpParameter = nullptr;
-    std::atomic<float>* enforceOrderParameter = nullptr;
+    std::atomic<float> * highToggleParameter = nullptr;
+    std::atomic<float> * highKnobParameter = nullptr;
+    std::atomic<float> * midToggleParameter = nullptr;
+    std::atomic<float> * midKnobParameter = nullptr;
+    std::atomic<float> * lowToggleParameter = nullptr;
+    std::atomic<float> * lowKnobParameter = nullptr;
+
+    // New auxiliary functions
+    void processToggleNotes(const juce::SortedSet<int>& notes, juce::SortedSet<int>& notesToProcess, float knobValue, bool isHighToggle);
+
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(MidiChordSplitterAudioProcessor)
 };

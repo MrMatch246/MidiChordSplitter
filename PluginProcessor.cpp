@@ -1,7 +1,4 @@
 #include "PluginProcessor.h"
-
-//#include <D2DBaseTypes.h>
-
 #include "PluginEditor.h"
 
 //==============================================================================
@@ -9,32 +6,34 @@ MidiChordSplitterAudioProcessor::MidiChordSplitterAudioProcessor()
     : AudioProcessor(BusesProperties()
 #if ! JucePlugin_IsMidiEffect
 #if ! JucePlugin_IsSynth
-                       .withInput  ("Input",  juce::AudioChannelSet::stereo(), true)
+                       .withInput("Input", juce::AudioChannelSet::stereo(), true)
 #endif
           .withOutput("Output", juce::AudioChannelSet::stereo(), true)
 #endif
-      ) , parameters(*this, nullptr, juce::Identifier("ValueTreeState"),
+      ), parameters(*this, nullptr, juce::Identifier("ValueTreeState"),
                     {
-                        std::make_unique<juce::AudioParameterFloat>("strumDelayMs", "Strum Delay Time", 0.0f, 1000.0f, 250.0f),
-                        std::make_unique<juce::AudioParameterBool>("isSynced", "Sync Mode", true),
-                        std::make_unique<juce::AudioParameterChoice>("timeSignatureChoice", "Time Signature", choices(), 2),
-                        std::make_unique<juce::AudioParameterBool>("isTriplet", "Triplet", false),
-                        std::make_unique<juce::AudioParameterBool>("isStrummingUp", "Strumming Direction", true),
-                        std::make_unique<juce::AudioParameterBool>("enforceOrder", "Order Mode", false)
+                        // Existing parameters for strumming
+
+                        // New parameters for high, mid, and low toggles and knobs
+                        std::make_unique<juce::AudioParameterBool>("highToggle", "High Toggle", true),
+                        std::make_unique<juce::AudioParameterInt>("highKnob", "High Knob", 0, 16, 0),
+                        std::make_unique<juce::AudioParameterBool>("midToggle", "Mid Toggle", true),
+                        std::make_unique<juce::AudioParameterInt>("midKnob", "Mid Knob", 0 , 16 , 1 ),
+                        std::make_unique<juce::AudioParameterBool>("lowToggle", "Low Toggle", true),
+                        std::make_unique<juce::AudioParameterInt>("lowKnob", "Low Knob", 0 , 16 , 0 ),
                     }
           )
 {
-    strumDelayParameter = parameters.getRawParameterValue("strumDelayMs");
-    isSyncedParameter = parameters.getRawParameterValue("isSynced");
-    isTripletParameter = parameters.getRawParameterValue("isTriplet");
-    timeSignatureChoice = dynamic_cast<juce::AudioParameterChoice*>(parameters.getParameter("timeSignatureChoice"));
-    isStrummingUpParameter = parameters.getRawParameterValue("isStrummingUp");
-    enforceOrderParameter = parameters.getRawParameterValue("enforceOrder");
+    // Initialize the new parameters
+    highToggleParameter = parameters.getRawParameterValue("highToggle");
+    highKnobParameter = parameters.getRawParameterValue("highKnob");
+    midToggleParameter = parameters.getRawParameterValue("midToggle");
+    midKnobParameter = parameters.getRawParameterValue("midKnob");
+    lowToggleParameter = parameters.getRawParameterValue("lowToggle");
+    lowKnobParameter = parameters.getRawParameterValue("lowKnob");
 }
 
-MidiChordSplitterAudioProcessor::~MidiChordSplitterAudioProcessor()
-{
-}
+MidiChordSplitterAudioProcessor::~MidiChordSplitterAudioProcessor() {}
 
 //==============================================================================
 const juce::String MidiChordSplitterAudioProcessor::getName() const
@@ -138,46 +137,19 @@ bool MidiChordSplitterAudioProcessor::isBusesLayoutSupported(const BusesLayout& 
 #endif
 }
 
-void MidiChordSplitterAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer,
-                                              juce::MidiBuffer& midiMessages)
+void MidiChordSplitterAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midiMessages)
 {
     auto totalNumInputChannels = getTotalNumInputChannels();
     auto totalNumOutputChannels = getTotalNumOutputChannels();
     for (auto i = totalNumInputChannels; i < totalNumOutputChannels; ++i)
         buffer.clear(i, 0, buffer.getNumSamples());
 
-
     const int numSamples = buffer.getNumSamples();
-    const auto sampleRate = getSampleRate();
-
-    bpm = getPlayHead()->getPosition()->getBpm().orFallback(120);
-    timeSig = *getPlayHead()->getPosition()->getTimeSignature();
-
-
-    int strumSampleDelay = 0;
-    if (isSyncedParameter->load())
-    {
-        int numerator =  timeSig.numerator == 0 ? 4 : timeSig.numerator;
-        int denominator = timeSigList[timeSignatureChoice->getIndex()];
-        strumSampleDelay = static_cast<int>(timePerBeat(bpm, numerator, denominator, isTripletParameter->load()) * sampleRate / 1000.0f);
-    }
-    else
-        strumSampleDelay = static_cast<int>(*strumDelayParameter * sampleRate / 1000.0f);
-
-    int strumSampleOffset = 0;
-    int eventsAhead = midiMessages.getNumEvents();
-
-
-    // if (eventsAhead > 0)
-    // {
-    //     DBG("Midi Events: " + juce::String(eventsAhead));
-    //     DBG("BPM: " + juce::String(bpm) + " TimeSig: " + juce::String(timeSig.numerator) + "/" +
-    //         juce::String(timeSig.denominator));
-    // }
-
-    juce::MidiBuffer newPreholdMidiBuffer;
     juce::MidiBuffer processedMidi;
     juce::SortedSet<int> notes;
+    juce::SortedSet<int> notesToProcess;
+
+    // Collect the notes in the chord
     for (const auto metadata : midiMessages)
     {
         const auto msg = metadata.getMessage();
@@ -187,107 +159,61 @@ void MidiChordSplitterAudioProcessor::processBlock(juce::AudioBuffer<float>& buf
         }
     }
 
+    // Process notes based on the toggle and knob values
+    if (highToggleParameter->load())
+    {
+        processToggleNotes(notes, notesToProcess, highKnobParameter->load(), true);
+    }
+    if (midToggleParameter->load())
+    {
+        processToggleNotes(notes, notesToProcess, midKnobParameter->load(), false);
+    }
+    if (lowToggleParameter->load())
+    {
+        processToggleNotes(notes, notesToProcess, lowKnobParameter->load(), false);
+    }
 
-    bool onNoteSeen = false;
-
-
+    // Now process the MIDI messages with the filtered notes
     for (const auto metadata : midiMessages)
     {
-        eventsAhead--;
         const auto msg = metadata.getMessage();
         const auto NoteNumber = msg.getNoteNumber();
-        const auto originalSamplePosition = metadata.samplePosition;
-        if (msg.isNoteOff())
+        if (notesToProcess.contains(NoteNumber))
         {
-            if (preholdNotes.count(NoteNumber) == 1 && preholdNotes[NoteNumber] >= originalSamplePosition)
-            {
-                preholdNotes.erase(NoteNumber);
-            }
-            else
-            {
-                processedMidi.addEvent(msg, originalSamplePosition);
-            }
-        }
-        else
-        {
-
-            auto targetSamplePosition = -1;
-            if (enforceOrderParameter->load())
-            {
-                int strumOffset = 0;
-                if (!isStrummingUpParameter->load())
-                    strumOffset = (notes.size() - notes.indexOf(NoteNumber) - 1) * strumSampleDelay;
-                else
-                    strumOffset = notes.indexOf(NoteNumber) * strumSampleDelay;
-                targetSamplePosition = originalSamplePosition + strumOffset;
-            }
-            else
-            {
-                if (onNoteSeen == false)
-                {
-                    onNoteSeen = true;
-                    if (isStrummingUpParameter->load())
-                        strumSampleOffset = 0;
-                    else
-                        strumSampleOffset = strumSampleDelay * (eventsAhead);
-                }
-                targetSamplePosition = originalSamplePosition + strumSampleOffset;
-            }
-
-
-
-            const auto newTargetPosition = targetSamplePosition - numSamples;
-            if (targetSamplePosition <= numSamples)
-            {
-                processedMidi.addEvent(msg, targetSamplePosition);
-                preholdNotes.erase(NoteNumber);
-            }
-            else
-            {
-                preholdNotes[NoteNumber] = newTargetPosition;
-                newPreholdMidiBuffer.addEvent(msg, newTargetPosition);
-            }
-
-
-            if(!enforceOrderParameter->load())
-            {
-                if (isStrummingUpParameter->load())
-                    strumSampleOffset += strumSampleDelay;
-                else
-                    strumSampleOffset -= strumSampleDelay;
-            }
-
+            processedMidi.addEvent(msg, metadata.samplePosition);
         }
     }
 
-
-    for (const auto metadata : preholdMidiBuffer)
-    {
-        const auto msg = metadata.getMessage();
-        const int NoteNumber = msg.getNoteNumber();
-        const int currentTargetSPos = metadata.samplePosition;
-        const int newTargetSPos = currentTargetSPos - numSamples;
-
-        if (currentTargetSPos <= numSamples)
-        {
-            if (preholdNotes.erase(NoteNumber) == 1)
-                processedMidi.addEvent(msg, currentTargetSPos);
-        }
-        else if (preholdNotes.count(NoteNumber) == 1 && currentTargetSPos > numSamples)
-        {
-            if (preholdNotes[NoteNumber] == currentTargetSPos)
-            {
-                preholdNotes[NoteNumber] = newTargetSPos;
-                newPreholdMidiBuffer.addEvent(msg, newTargetSPos);
-            }
-        }
-    }
-
-    preholdMidiBuffer.swapWith(newPreholdMidiBuffer);
     midiMessages.swapWith(processedMidi);
 }
 
-//==============================================================================
+void MidiChordSplitterAudioProcessor::processToggleNotes(const juce::SortedSet<int>& notes, juce::SortedSet<int>& notesToProcess, float knobValue, bool isHighToggle)
+{
+    if (notes.isEmpty()) return;
+
+    // Determine the notes to process based on knob value
+    const int numNotes = notes.size();
+    int noteIndex = -1;
+
+    if (isHighToggle)
+    {
+        // For the high toggle, get the highest note based on the knob
+        noteIndex = numNotes - 1 - (int)knobValue;
+    }
+    else if (knobValue >= 0)
+    {
+        // For low/mid, calculate the index based on knob value
+        noteIndex = juce::jmin((int)knobValue, numNotes - 1);  // Ensure we don't exceed the available notes
+    }
+
+    if (noteIndex >= 0 && noteIndex < numNotes)
+    {
+        // Add the note to the processing list
+        notesToProcess.add(notes.getReference(noteIndex));
+    }
+}
+
+
 bool MidiChordSplitterAudioProcessor::hasEditor() const
 {
     return true; // (change this to false if you choose to not supply an editor)
@@ -295,45 +221,20 @@ bool MidiChordSplitterAudioProcessor::hasEditor() const
 
 juce::AudioProcessorEditor* MidiChordSplitterAudioProcessor::createEditor()
 {
-    return new MidiChordSplitterAudioProcessorEditor(*this , parameters);
+    return new MidiChordSplitterAudioProcessorEditor(*this, parameters);
 }
 
-
-
-//==============================================================================
 void MidiChordSplitterAudioProcessor::getStateInformation(juce::MemoryBlock& destData)
 {
-    // You should use this method to store your parameters in the memory block.
-    // You could do that either as raw data, or use the XML or ValueTree classes
-    // as intermediaries to make it easy to save and load complex data.
+    // Store parameters in the memory block
     juce::ignoreUnused(destData);
 }
 
 void MidiChordSplitterAudioProcessor::setStateInformation(const void* data, int sizeInBytes)
 {
-    // You should use this method to restore your parameters from this memory block,
-    // whose contents will have been created by the getStateInformation() call.
+    // Restore parameters from the memory block
     juce::ignoreUnused(data, sizeInBytes);
 }
-
-double MidiChordSplitterAudioProcessor::timePerBeat(int bpm, int x, int y, bool triplet = false) {
-    double factor = triplet ? 2.0 / 3.0 : 1.0; // For triplet rhythm, adjust factor
-    double divisor = triplet ? 2.0 : 1.0; // For triplet rhythm, use 2 BPM
-
-    return 60000.0 / (bpm * divisor * y) * x * factor;
-}
-
-const juce::StringArray MidiChordSplitterAudioProcessor::choices(bool triplet)
-{
-    juce::StringArray choices = {};
-    for (auto denumerator : timeSigList)
-    {
-        choices.add("1/"+juce::String(denumerator) + (triplet ? "T" : ""));
-    }
-    return choices;
-}
-
-
 
 //==============================================================================
 // This creates new instances of the plugin..
